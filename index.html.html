@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Sistema de Coleta e Controle de Defeitos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Biblioteca para exportar Excel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+body{
+    font-family: Arial, Helvetica, sans-serif;
+    background:#f2f4f7;
+    margin:0;
+    padding:20px;
+}
+.container{
+    max-width:1300px;
+    margin:auto;
+    background:#fff;
+    padding:20px;
+    border-radius:8px;
+    box-shadow:0 0 10px rgba(0,0,0,0.1);
+}
+h1{
+    text-align:center;
+    margin-bottom:20px;
+}
+fieldset{
+    border:1px solid #ccc;
+    padding:15px;
+    margin-bottom:20px;
+}
+legend{
+    font-weight:bold;
+}
+.grid{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:10px;
+}
+label{
+    font-size:14px;
+    font-weight:bold;
+}
+input, select, button{
+    padding:8px;
+    width:100%;
+    box-sizing:border-box;
+}
+input[readonly]{
+    background:#e9ecef;
+}
+button{
+    cursor:pointer;
+    border:none;
+    border-radius:4px;
+}
+.btn-primary{
+    background:#007bff;
+    color:#fff;
+}
+.btn-success{
+    background:#28a745;
+    color:#fff;
+}
+.btn-export{
+    background:#17a2b8;
+    color:#fff;
+    margin-top:10px;
+}
+.table-container{
+    max-height:350px;
+    overflow:auto;
+}
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+th, td{
+    border:1px solid #ccc;
+    padding:6px;
+    font-size:13px;
+    text-align:center;
+}
+th{
+    background:#343a40;
+    color:#fff;
+}
+@media(max-width:900px){
+    .grid{grid-template-columns: repeat(2, 1fr);}    
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>Sistema de Coleta e Controle de Defeitos</h1>
+
+<fieldset>
+<legend>Dados Fixos</legend>
+<div class="grid">
+<div>
+<label>Data</label>
+<input type="date" id="data">
+</div>
+<div>
+<label>Hora</label>
+<input type="time" id="hora">
+</div>
+<div>
+<label>Linha</label>
+<input type="text" id="linha" value="LINHA 01">
+</div>
+<div>
+<label>Modelo</label>
+<input type="text" id="modelo" value="MODELO X">
+</div>
+<div>
+<label>OP</label>
+<input type="text" id="op" value="OP0001">
+</div>
+<div>
+<label>Posto</label>
+<input type="text" id="posto" value="REVISÃO IM">
+</div>
+<div>
+<label>Nome do Operador</label>
+<input type="text" id="operador" placeholder="Digite e pressione Enter">
+</div>
+</div>
+</fieldset>
+
+<fieldset>
+<legend>Registro do Defeito</legend>
+<div class="grid">
+<div>
+<label>Posição Mecânica</label>
+<input type="text" id="posicao">
+</div>
+<div>
+<label>Código do Defeito</label>
+<input list="listaCodigos" id="codigo">
+<datalist id="listaCodigos"></datalist>
+</div>
+<div>
+<label>Diagnóstico</label>
+<input type="text" id="diagnostico" readonly>
+</div>
+<div>
+<label>Quantidade</label>
+<input type="number" id="qtd" min="1">
+</div>
+</div>
+<br>
+<button class="btn-primary" onclick="registrarDefeito()">Registrar Defeito</button>
+</fieldset>
+
+<fieldset>
+<legend>Registros</legend>
+<div class="table-container">
+<table id="tabela">
+<thead>
+<tr>
+<th>Data</th><th>Hora</th><th>Linha</th><th>Modelo</th><th>OP</th><th>Posto</th><th>Operador</th><th>Posição</th><th>Código</th><th>Diagnóstico</th><th>Qtd</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+<button class="btn-export" onclick="exportarExcel()">Exportar para Excel</button>
+</fieldset>
+</div>
+
+<script>
+// BASE FIXA DE CÓDIGOS
+const codigos = {
+"CP01":"FALTANDO","CP02":"ERRADO","CP03":"DESLOCADO","CP04":"INVERTIDO","CP05":"DANIFICADO","CP06":"OXIDADO","CP07":"ALTO","CP08":"TOMBSTONE","CP09":"SEM PROJEÇÃO","CP10":"ALTERADO","CP11":"TERMINAL DOBRADO","CP12":"GRAVAÇÃO ERRADA","CP13":"POSIÇÃO ERRADA","CP14":"VALOR ERRADO","CP15":"RETRABALHO","CP16":"COMPONENTE DE LADO","CP17":"COMPONENTE EMBORCADO","CP18":"COMPONENTE EM PÉ","CP19":"TERMINAL EM CURTO","CP20":"TERMINAL ALTO","CP21":"SOBREPOSTO","CP22":"COMPLANADO","CP23":"ABERTO","CP24":"SOLTO","CP25":"COMPONENTE JOGADO","CP26":"TERMINAL LONGO","CP27":"TERMINAL CURTO","CP28":"MAL INSERIDO","CP29":"ERRO DE INSERÇÃO","CP30":"DUPLICADO","CP31":"TOMBADO",
+"PL01":"OXIDADA","PL02":"TRILHA ROMPIDA","PL03":"TRILHA ABERTA","PL04":"PLACA BATIDA","PL05":"PLACA ALAGADA","PL06":"ABAULADA","PL07":"FURO OBSTRUÍDO","PL08":"SUJA","PL09":"DANIFICADA","PL10":"CORPO ESTRANHO","PL11":"CONTAMINAÇÃO","PL12":"DNC (DEFEITO NÃO CONSTATADO)","PL13":"SEM PAD",
+"SL01":"SOLDA FRIA","SL02":"SEM SOLDA","SL03":"SOLDA INSUFICIENTE","SL04":"SOLDA EM CURTO","SL05":"SOLDER BALL","SL06":"EXCESSO DE SOLDA","SL07":"TERMINAL NÃO SOLDADO",
+"AD01":"AD. FALTANDO","AD02":"AD. INSUFICIENTE","AD03":"AD. EM EXCESSO","AD04":"AD. DESLOCADO","AD05":"NO PAD","AD06":"CURTO DE IMPRESSO"
+};
+
+const lista = document.getElementById("listaCodigos");
+Object.keys(codigos).forEach(c=>{
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c + " - " + codigos[c];
+    lista.appendChild(opt);
+});
+
+// DATA E HORA AUTOMÁTICA
+const hoje = new Date();
+document.getElementById('data').value = hoje.toISOString().split('T')[0];
+document.getElementById('hora').value = hoje.toTimeString().substring(0,5);
+
+// BLOQUEIO DO OPERADOR (automaticamente ao preencher)
+const operadorInput = document.getElementById('operador');
+operadorInput.addEventListener('blur', ()=>{
+    if(operadorInput.value !== ''){
+        operadorInput.readOnly = true;
+    }
+});
+
+// AUTO DIAGNÓSTICO
+const codigoInput = document.getElementById('codigo');
+codigoInput.addEventListener('input', ()=>{
+    document.getElementById('diagnostico').value = codigos[codigoInput.value] || '';
+});
+
+let registros = JSON.parse(localStorage.getItem('defeitos')) || [];
+
+function atualizarTabela(){
+    const tbody = document.querySelector('#tabela tbody');
+    tbody.innerHTML = '';
+    registros.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.data}</td><td>${r.hora}</td><td>${r.linha}</td><td>${r.modelo}</td><td>${r.op}</td><td>${r.posto}</td><td>${r.operador}</td><td>${r.posicao}</td><td>${r.codigo}</td><td>${r.diagnostico}</td><td>${r.qtd}</td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+function registrarDefeito(){
+    if(!operadorInput.readOnly){ alert('Defina o operador e pressione Enter'); return; }
+
+    const reg = {
+        data: data.value,
+        hora: hora.value,
+        linha: linha.value,
+        modelo: modelo.value,
+        op: op.value,
+        posto: posto.value,
+        operador: operador.value,
+        posicao: posicao.value,
+        codigo: codigo.value,
+        diagnostico: diagnostico.value,
+        qtd: qtd.value
+    };
+
+    registros.push(reg);
+    localStorage.setItem('defeitos', JSON.stringify(registros));
+    atualizarTabela();
+
+    posicao.value = '';
+    codigo.value = '';
+    diagnostico.value = '';
+    qtd.value = '';
+}
+
+function exportarExcel(){
+    const ws = XLSX.utils.json_to_sheet(registros);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Defeitos');
+    XLSX.writeFile(wb, 'defeitos.xlsx');
+}
+
+atualizarTabela();
+</script>
+
+</body>
+</html>
